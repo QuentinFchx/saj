@@ -11,13 +11,15 @@ defmodule Saj.Parser do
       listener: listener
     }
 
-    File.open!(path)
+    path
+    |> File.open!
     |> IO.stream(1)
     |> Enum.reduce(state, fn(char, state) -> consume_char(char, state) end)
   end
 
   # -----------------------------------------
 
+  @lint {Credo.Check.Refactor.CyclomaticComplexity, false}
   defp consume_char(char, state) do
     if String.length(String.strip(char)) == 0 and not state.status in [:in_string, :in_number] do
       state
