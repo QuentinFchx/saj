@@ -1,10 +1,14 @@
 # Saj
 
-**TODO: Add description**
+*inspired by [JsonStreamingParser](https://github.com/salsify/jsonstreamingparser)*
+
+This is a simple, streaming parser for processing large JSON documents. Use it for parsing very large JSON documents to avoid loading the entire thing into memory
+
+[Documentation](https://hexdocs.pm/saj/api-reference.html)
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed as:
+The package can be installed as:
 
   1. Add `saj` to your list of dependencies in `mix.exs`:
 
@@ -21,4 +25,3 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
       [applications: [:saj]]
     end
     ```
-
