@@ -1,73 +1,79 @@
-# {
-#   "foo": {
-#     "bar": [{"baz":1},{"baz":2}]
-#   }
-# }
-#
-# foo
-# foo.bar
-# foo.bar[]
-# foo.bar[1]
-# foo.bar[0].baz
-# foo.bar[].baz
+defmodule Saj.Query do
+  def from_path(path) do
+    %{
+      path: path,
+      status: :inactive,
+      accumulator: []
+    }
+  end
+
+  def handle_value(query, path, value) do
+    if :lists.prefix(query[:path], path) do
+      add_value(query, path, value)
+    else
+      case Map.get(query, :status) do
+        :building -> finish(query)
+        _ -> query
+      end
+    end
+  end
+
+  def add_value(query, path, value) do
+    sanitized_path =
+      path
+      |> :ordsets.subtract(query[:path])
+      |> :lists.reverse
+
+    query
+    |> Map.update!(:accumulator, fn(paths) -> paths ++ [{sanitized_path, value}] end)
+    |> Map.put(:status, :building)
+  end
+
+  def finish(query) do
+    IO.puts("DONE: " <> inspect(query))
+    Map.put(query, :status, :done)
+  end
+end
 
 defmodule Saj.Searcher do
-  use GenServer
+  alias Saj.Query
 
-  def start(queries) do
-    {:ok, searcher} = GenServer.start(__MODULE__, [])
-    searcher
+  def init (queries \\ []) do
+    queries
+    |> Enum.map(fn(query) ->
+      Query.from_path(query)
+    end)
   end
 
-  def handle_event(searcher, atom, value) do
-    GenServer.cast(searcher, {:event, %{atom: atom, value: value}})
+  def handle_value(path, :null, queries), do: handle_value(path, nil, queries)
+  def handle_value(path, value, queries) do
+    queries
+    |> Enum.map(fn(query) ->
+      Query.handle_value(query, path, value)
+    end)
+    |> Enum.filter(fn(query) -> Map.get(query, :status) != :done end)
   end
 
-  def get_stack(searcher) do
-    GenServer.call(searcher, {:stack})
-  end
-
-  def get_path(searcher) do
-    GenServer.call(searcher, {:path})
-  end
-
-  def handle_cast({:event, event}, stack) do
-    %{atom: atom, value: value} = event
-
-    stack = case atom do
-      :document ->
-        case value do
-          :start -> [:root]
-          :end -> []
-        end
-      :object ->
-        case value do
-          :start -> ["." | stack]
-          :end -> tl(stack)
-        end
-      :key -> [value | stack]
-      _ -> stack
-    end
-
-    {:noreply, stack}
-  end
-
-  defp path_from_stack(stack) do
-    stack
-    |> Enum.reverse
-    |> Enum.join
+  def finish(queries) do
+    IO.puts("finito")
+    IO.puts(inspect(queries))
   end
 end
 
 defmodule Saj.Search do
   alias Saj.Searcher
-  alias Saj.Parser
 
   def search(path, queries \\ []) do
-    searcher = Searcher.start(queries)
-
-    Parser.parse(path, fn(atom, value) ->
-      Searcher.handle_event(searcher, atom, value)
-    end)
+    initial_state = :jsonfilter.filter("", Searcher, queries, [:stream])
+    {:incomplete, f} =
+      path
+      |> File.open!
+      |> IO.stream(255)
+      |> Enum.reduce(initial_state, fn(chunk, state) ->
+        {:incomplete, f} = state
+        f.(chunk)
+      end)
+    f.(:end_stream)
+    :ok
   end
 end
