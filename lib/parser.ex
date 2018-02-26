@@ -12,16 +12,16 @@ defmodule Saj.Parser do
     }
 
     path
-    |> File.open!
+    |> File.open!()
     |> IO.stream(1)
-    |> Enum.reduce(state, fn(char, state) -> consume_char(char, state) end)
+    |> Enum.reduce(state, fn char, state -> consume_char(char, state) end)
   end
 
   # -----------------------------------------
 
   @lint {Credo.Check.Refactor.CyclomaticComplexity, false}
   defp consume_char(char, state) do
-    if String.length(String.strip(char)) == 0 and not state.status in [:in_string, :in_number] do
+    if String.length(String.strip(char)) == 0 and not (state.status in [:in_string, :in_number]) do
       state
     else
       case state.status do
@@ -89,6 +89,7 @@ defmodule Saj.Parser do
           "}" -> end_object(state)
           "," -> struct(state, %{status: :in_object})
         end
+
       :array ->
         case char do
           "]" -> end_array(state)
@@ -99,7 +100,9 @@ defmodule Saj.Parser do
 
   defp in_escape(char, state) do
     case char do
-      "u" -> struct(state, %{status: :in_string})
+      "u" ->
+        struct(state, %{status: :in_string})
+
       escaped when escaped in ["\"", "\\", "/", "f", "n", "r", "t"] ->
         struct(state, %{status: :in_string, buffer: state.buffer <> "\\" <> escaped})
     end
@@ -107,34 +110,43 @@ defmodule Saj.Parser do
 
   defp in_number(char, state) do
     case Integer.parse(char) do
-      {int, _} -> struct(state, %{buffer: state.buffer <> char})
-      _ -> case char do
-        "." -> state
-        e when e in ["e", "E"] -> state
-        sign when sign in ["-", "+"] -> state
-        _ -> consume_char(char, end_number(state))
-      end
+      {int, _} ->
+        struct(state, %{buffer: state.buffer <> char})
+
+      _ ->
+        case char do
+          "." -> state
+          e when e in ["e", "E"] -> state
+          sign when sign in ["-", "+"] -> state
+          _ -> consume_char(char, end_number(state))
+        end
     end
   end
 
   defp in_true(char, state) do
-    state = struct(state, %{
-      buffer: state.buffer <> char
-    })
+    state =
+      struct(state, %{
+        buffer: state.buffer <> char
+      })
+
     if String.length(state.buffer) >= 4, do: end_true(state), else: state
   end
 
   defp in_false(char, state) do
-    state = struct(state, %{
-      buffer: state.buffer <> char
-    })
+    state =
+      struct(state, %{
+        buffer: state.buffer <> char
+      })
+
     if String.length(state.buffer) >= 5, do: end_false(state), else: state
   end
 
   defp in_null(char, state) do
-    state = struct(state, %{
-      buffer: state.buffer <> char
-    })
+    state =
+      struct(state, %{
+        buffer: state.buffer <> char
+      })
+
     if String.length(state.buffer) >= 4, do: end_null(state), else: state
   end
 
@@ -161,10 +173,12 @@ defmodule Saj.Parser do
     state.listener.(:object, :end)
 
     [popped | stack] = state.stack
-    state = struct(state, %{
-      status: :after_value,
-      stack: stack
-    })
+
+    state =
+      struct(state, %{
+        status: :after_value,
+        stack: stack
+      })
 
     case length(stack) do
       0 -> end_document(state)
@@ -192,6 +206,7 @@ defmodule Saj.Parser do
     state.listener.(:array, :end)
 
     [popped | stack] = state.stack
+
     struct(state, %{
       status: :after_value,
       stack: stack
@@ -200,15 +215,28 @@ defmodule Saj.Parser do
 
   defp start_value(char, state) do
     case char do
-      "[" -> start_array(state)
-      "{" -> start_object(state)
-      "\"" -> start_string(state)
-      "t" -> start_true(state)
-      "f" -> start_false(state)
-      "n" -> start_null(state)
-      _ -> case Integer.parse(char) do
-        {int, _} -> start_number(char, state)
-      end
+      "[" ->
+        start_array(state)
+
+      "{" ->
+        start_object(state)
+
+      "\"" ->
+        start_string(state)
+
+      "t" ->
+        start_true(state)
+
+      "f" ->
+        start_false(state)
+
+      "n" ->
+        start_null(state)
+
+      _ ->
+        case Integer.parse(char) do
+          {int, _} -> start_number(char, state)
+        end
     end
   end
 
@@ -222,14 +250,16 @@ defmodule Saj.Parser do
   defp end_string(state) do
     [popped | stack] = state.stack
 
-    status = case popped do
-      :key ->
-        state.listener.(:key, state.buffer)
-        :end_key
-      :string ->
-        state.listener.(:value, state.buffer)
-        :after_value
-    end
+    status =
+      case popped do
+        :key ->
+          state.listener.(:key, state.buffer)
+          :end_key
+
+        :string ->
+          state.listener.(:value, state.buffer)
+          :after_value
+      end
 
     struct(state, %{
       status: status,

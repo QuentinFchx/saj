@@ -34,28 +34,34 @@ defmodule Saj.Searcher do
   def handle_cast({:event, event}, stack) do
     %{atom: atom, value: value} = event
 
-    stack = case atom do
-      :document ->
-        case value do
-          :start -> [:root]
-          :end -> []
-        end
-      :object ->
-        case value do
-          :start -> ["." | stack]
-          :end -> tl(stack)
-        end
-      :key -> [value | stack]
-      _ -> stack
-    end
+    stack =
+      case atom do
+        :document ->
+          case value do
+            :start -> [:root]
+            :end -> []
+          end
+
+        :object ->
+          case value do
+            :start -> ["." | stack]
+            :end -> tl(stack)
+          end
+
+        :key ->
+          [value | stack]
+
+        _ ->
+          stack
+      end
 
     {:noreply, stack}
   end
 
   defp path_from_stack(stack) do
     stack
-    |> Enum.reverse
-    |> Enum.join
+    |> Enum.reverse()
+    |> Enum.join()
   end
 end
 
@@ -66,7 +72,7 @@ defmodule Saj.Search do
   def search(path, queries \\ []) do
     searcher = Searcher.start(queries)
 
-    Parser.parse(path, fn(atom, value) ->
+    Parser.parse(path, fn atom, value ->
       Searcher.handle_event(searcher, atom, value)
     end)
   end
